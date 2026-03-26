@@ -1,0 +1,174 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INÍCIO DO PROGRAMA                                 │
+│                              (main())                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      1. PARSE ARGUMENTOS DO USUÁRIO                          │
+│                    (build_parser() + parse_args())                          │
+│  • Define diretório de saída                                                │
+│  • Configura seed aleatória                                                 │
+│  • Define parâmetros de simulação                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      2. INICIALIZAÇÃO DO MODELO                              │
+│                    (PelotasElectionABM.__init__())                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        ▼                             ▼                             ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ 2.1 Carregar/     │    │ 2.2 Carregar/     │    │ 2.3 Gerar         │
+│     Gerar Partidos│    │     Gerar         │    │     Eleitores     │
+│                   │    │     Candidatos    │    │                   │
+│ • Se CSV existe:  │    │ • Se CSV existe:  │    │ • Ideologia      │
+│   lê do arquivo   │    │   lê do arquivo   │    │ • Bairro         │
+│ • Senão: gera     │    │ • Senão: gera     │    │ • Interesse      │
+│   sintéticos      │    │   sintéticos      │    │ • Susceptibilidade│
+│                   │    │                   │    │ • Partido preferido│
+└───────────────────┘    └───────────────────┘    └───────────────────┘
+        │                             │                             │
+        └─────────────────────────────┼─────────────────────────────┘
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      2.4 CRIAR REDE SOCIAL                                   │
+│                    (make_small_world_neighbors())                           │
+│  • Cria rede estilo "mundo pequeno" (Watts-Strogatz)                        │
+│  • Cada eleitor tem k vizinhos                                              │
+│  • Probabilidade de reconexão = rewire_prob                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      2.5 PRÉ-COMPUTAÇÃO                                      │
+│                    (_precompute_candidate_arrays())                         │
+│                    (_precompute_voter_arrays())                             │
+│  • Converte DataFrames para arrays numpy (performance)                      │
+│  • Calcula matriz de força territorial                                      │
+│  • Calcula recursos efetivos dos candidatos                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      3. EXECUTAR SIMULAÇÃO                                   │
+│                           (run())                                            │
+│                                                                              │
+│  Inicializa escolhas aleatórias dos eleitores                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+                          ┌───────────────────────┐
+                          │  LOOP PRINCIPAL       │
+                          │ for t in range(steps) │
+                          └───────────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        ▼                             ▼                             ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ 3.1 ATUALIZAR     │    │ 3.2 AGREGAR       │    │ 3.3 ATUALIZAR     │
+│    VISIBILIDADE   │    │    SUPORTE SOCIAL │    │    ELEITORES      │
+│    DOS CANDIDATOS │    │                   │    │    (LOOP ANINHADO)│
+│                   │    │ • Conta votos do  │    │                   │
+│ • Decaimento:     │    │   passo anterior  │    │ Para cada eleitor:│
+│   (1-δ)×vis_atual │    │ • Calcula share   │    │  • Coleta        │
+│ • Contribuição:   │    │   dos candidatos  │    │    vizinhos      │
+│   - Recursos      │    │ • Calcula força   │    │  • Calcula       │
+│   - Qualidade     │    │   dos partidos    │    │    utilidade:    │
+│   - Org. partido  │    │                   │    │    - Ideologia   │
+│   - Força local   │    │                   │    │    - Visibilidade│
+│                   │    │                   │    │    - Territorial │
+└───────────────────┘    └───────────────────┘    │    - Social      │
+        │                             │           │    - Partido     │
+        │                             │           │    - Incumbência │
+        │                             │           │    - Voto estratégico│
+        │                             │           │    - Ruído       │
+        │                             │           │  • Shortlist     │
+        │                             │           │    (top visíveis)│
+        │                             │           │  • Softmax       │
+        │                             │           │    choice        │
+        └─────────────────────────────┼───────────┘                    │
+                                      ▼                                │
+                          ┌───────────────────────┐                    │
+                          │  FIM DO LOOP?         │                    │
+                          └───────────────────────┘                    │
+                                      │                                │
+                                      ▼                                │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      4. APÓS SIMULAÇÃO                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        ▼                             ▼                             ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ 4.1 AGREGAR       │    │ 4.2 ALOCAR        │    │ 4.3 ASSIGNAR      │
+│     RESULTADOS    │    │     CADEIRAS      │    │     ELEITOS       │
+│                   │    │                   │    │                   │
+│ • Contar votos    │    │ allocate_seats_   │    │ _assign_elected() │
+│   por candidato   │    │ largest_remainder │    │                   │
+│ • Calcular share  │    │                   │    │ • Para cada      │
+│   de votos        │    │ • Quociente       │    │   partido:       │
+│ • Agregar por     │    │   eleitoral       │    │   elege top N    │
+│   partido         │    │ • Distribuição    │    │   candidatos     │
+│                   │    │   de cadeiras     │    │   por votos      │
+└───────────────────┘    └───────────────────┘    └───────────────────┘
+        │                             │                             │
+        └─────────────────────────────┼─────────────────────────────┘
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      5. SALVAR RESULTADOS                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        ▼                             ▼                             ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ candidate_results │    │ party_results.csv │    │ timeseries_       │
+│ .csv              │    │                   │    │ visibility.csv    │
+│                   │    │ • Votos por       │    │                   │
+│ • Votos por       │    │   partido         │    │ • Evolução da    │
+│   candidato       │    │ • Cadeiras        │    │   visibilidade   │
+│ • Eleito ou não   │    │ • Quociente       │    │   ao longo do    │
+│ • Rank no partido │    │   eleitoral       │    │   tempo          │
+└───────────────────┘    └───────────────────┘    └───────────────────┘
+        │                             │                             │
+        ▼                             ▼                             ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ voter_results.csv │    │ summary.json      │    │ params.json       │
+│ (opcional/amostra)│    │                   │    │                   │
+│                   │    │ • Estatísticas:  │    │ • Configuração    │
+│ • Escolha de cada │    │   - Gini         │    │   completa da    │
+│   eleitor         │    │   - Correlações  │    │   simulação      │
+│                   │    │   - Top 10 share │    │                   │
+└───────────────────┘    └───────────────────┘    └───────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      6. GERAR GRÁFICOS                                      │
+│                         (_make_plots())                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        ▼                             ▼                             ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│ candidate_vote_   │    │ party_seats.png   │    │ resources_vs_     │
+│ distribution.png  │    │                   │    │ votes.png         │
+│                   │    │ • Barras com     │    │                   │
+│ • Curva de Pareto │    │   cadeiras por   │    │ • Scatter plot    │
+│   (rank vs votos) │    │   partido        │    │   recursos vs    │
+│                   │    │                   │    │   votos          │
+└───────────────────┘    └───────────────────┘    └───────────────────┘
+        │                             │                             │
+        └─────────────────────────────┼─────────────────────────────┘
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    mean_visibility_over_time.png                            │
+│                    • Evolução média da visibilidade                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              FIM DO PROGRAMA                                 │
+│                    (retorna summary e imprime JSON)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
