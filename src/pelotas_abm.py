@@ -40,67 +40,67 @@ import matplotlib.pyplot as plt
 # Dataclasses
 # -----------------------------
 
-@dataclass
-class Party:
-    """
-    Represents a political party in the election model.
+# @dataclass
+# class Party:
+#     """
+#     Represents a political party in the election model.
     
-    Attributes:
-        party_id: Unique identifier for the party
-        name: Party name or abbreviation
-        ideology: Position on left-right spectrum (-1 = left, 1 = right)
-        organization: Organizational capacity (0-1), affects vote probability
-        central_budget: Total financial resources controlled by party central committee
-        strategic_concentration: How concentrated resources are on priority candidates
-                                   (higher values = more concentration)
-    """
-    party_id: int
-    name: str
-    ideology: float
-    organization: float
-    central_budget: float
-    strategic_concentration: float
+#     Attributes:
+#         party_id: Unique identifier for the party
+#         name: Party name or abbreviation
+#         ideology: Position on left-right spectrum (-1 = left, 1 = right)
+#         organization: Organizational capacity (0-1), affects vote probability
+#         central_budget: Total financial resources controlled by party central committee
+#         strategic_concentration: How concentrated resources are on priority candidates
+#                                    (higher values = more concentration)
+#     """
+#     party_id: int
+#     name: str
+#     ideology: float
+#     organization: float
+#     central_budget: float
+#     strategic_concentration: float
 
 
-@dataclass
-class Candidate:
-    """
-    Represents a candidate running for office.
+# @dataclass
+# class Candidate:
+#     """
+#     Represents a candidate running for office.
     
-    Attributes:
-        candidate_id: Unique identifier for the candidate
-        name: Candidate's full name
-        party_id: ID of the party they belong to
-        ideology: Individual ideological position (may differ from party)
-        incumbency: Whether candidate is running for re-election (1) or not (0)
-        priority: Priority level within party for resource allocation (higher = more priority)
-        quality: Perceived candidate quality/competence (0-1)
-        initial_capital: Candidate's own initial campaign funds
-        cpf_donations: Donations from individuals (CPF = Brazilian individual taxpayer ID)
-        cnpj_donations: Donations from companies (CNPJ = Brazilian corporate taxpayer ID)
-        non_original_donations: Other sources of donations
-        total_donations: Sum of all donations
-        base_bairro: Neighborhood where candidate has strongest territorial connection
-        gender: Gender indicator (0 = female, 1 = male, or as defined)
-        party_base: Type of party base (1-3, indicating different support structures)
-        initial_visibility: Starting visibility level before campaign begins
-    """
-    candidate_id: int
-    name: str
-    party_id: int
-    ideology: float
-    incumbency: int
-    priority: float
-    quality: float
-    initial_capital: float
-    cpf_donations: float
-    cnpj_donations: float
-    non_original_donations: float
-    total_donations: float
-    base_bairro: int
-    gender: int
-    party_base: int
-    initial_visibility: float
+#     Attributes:
+#         candidate_id: Unique identifier for the candidate
+#         name: Candidate's full name
+#         party_id: ID of the party they belong to
+#         ideology: Individual ideological position (may differ from party)
+#         incumbency: Whether candidate is running for re-election (1) or not (0)
+#         priority: Priority level within party for resource allocation (higher = more priority)
+#         quality: Perceived candidate quality/competence (0-1)
+#         initial_capital: Candidate's own initial campaign funds
+#         cpf_donations: Donations from individuals (CPF = Brazilian individual taxpayer ID)
+#         cnpj_donations: Donations from companies (CNPJ = Brazilian corporate taxpayer ID)
+#         non_original_donations: Other sources of donations
+#         total_donations: Sum of all donations
+#         base_bairro: Neighborhood where candidate has strongest territorial connection
+#         gender: Gender indicator (0 = female, 1 = male, or as defined)
+#         party_base: Type of party base (1-3, indicating different support structures)
+#         initial_visibility: Starting visibility level before campaign begins
+#     """
+#     candidate_id: int
+#     name: str
+#     party_id: int
+#     ideology: float
+#     incumbency: int
+#     priority: float
+#     quality: float
+#     initial_capital: float
+#     cpf_donations: float
+#     cnpj_donations: float
+#     non_original_donations: float
+#     total_donations: float
+#     base_bairro: int
+#     gender: int
+#     party_base: int
+#     initial_visibility: float
 
 
 # -----------------------------
