@@ -1,0 +1,45 @@
+pelotas_election_abm/
+├── __init__.py
+├── main.py                    # Ponto de entrada principal
+├── config/
+│   ├── __init__.py
+│   └── parameters.py          # Configurações e argumentos
+├── models/
+│   ├── __init__.py
+│   ├── party.py               # Classe Party e lógica relacionada
+│   ├── candidate.py           # Classe Candidate
+│   ├── voter.py               # Classe Voter
+│   └── election.py            # Resultados eleitorais
+├── agents/
+│   ├── __init__.py
+│   ├── party_agent.py         # Lógica de decisão dos partidos
+│   ├── candidate_agent.py     # Lógica dos candidatos
+│   └── voter_agent.py         # Lógica de escolha dos eleitores
+├── simulation/
+│   ├── __init__.py
+│   ├── model.py               # Classe principal que coordena
+│   ├── environment.py         # Rede social, territorial
+│   └── dynamics.py            # Atualização de visibilidade, etc.
+├── data/
+│   ├── __init__.py
+│   ├── loader.py              # Carregar dados de CSV
+│   ├── generator.py           # Gerar dados sintéticos
+│   └── preprocessor.py        # Pré-processamento
+├── electoral/
+│   ├── __init__.py
+│   ├── seat_allocation.py     # Métodos de alocação de cadeiras
+│   └── vote_counting.py       # Apuração de votos
+├── outputs/
+│   ├── __init__.py
+│   ├── saver.py               # Salvar resultados
+│   └── plots.py               # Geração de gráficos
+├── utils/
+│   ├── __init__.py
+│   ├── math_utils.py          # softmax, sigmoid, distâncias
+│   ├── network_utils.py       # Criação de redes sociais
+│   └── random_utils.py        # Geradores randomicos
+└── tests/
+    ├── __init__.py
+    ├── test_voter_choice.py
+    ├── test_seat_allocation.py
+    └── test_visibility.py
