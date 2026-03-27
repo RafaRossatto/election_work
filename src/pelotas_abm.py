@@ -27,81 +27,16 @@ import argparse
 import json
 import math
 import os
-from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# -----------------------------
-# Dataclasses
-# -----------------------------
-
-# @dataclass
-# class Party:
-#     """
-#     Represents a political party in the election model.
-    
-#     Attributes:
-#         party_id: Unique identifier for the party
-#         name: Party name or abbreviation
-#         ideology: Position on left-right spectrum (-1 = left, 1 = right)
-#         organization: Organizational capacity (0-1), affects vote probability
-#         central_budget: Total financial resources controlled by party central committee
-#         strategic_concentration: How concentrated resources are on priority candidates
-#                                    (higher values = more concentration)
-#     """
-#     party_id: int
-#     name: str
-#     ideology: float
-#     organization: float
-#     central_budget: float
-#     strategic_concentration: float
-
-
-# @dataclass
-# class Candidate:
-#     """
-#     Represents a candidate running for office.
-    
-#     Attributes:
-#         candidate_id: Unique identifier for the candidate
-#         name: Candidate's full name
-#         party_id: ID of the party they belong to
-#         ideology: Individual ideological position (may differ from party)
-#         incumbency: Whether candidate is running for re-election (1) or not (0)
-#         priority: Priority level within party for resource allocation (higher = more priority)
-#         quality: Perceived candidate quality/competence (0-1)
-#         initial_capital: Candidate's own initial campaign funds
-#         cpf_donations: Donations from individuals (CPF = Brazilian individual taxpayer ID)
-#         cnpj_donations: Donations from companies (CNPJ = Brazilian corporate taxpayer ID)
-#         non_original_donations: Other sources of donations
-#         total_donations: Sum of all donations
-#         base_bairro: Neighborhood where candidate has strongest territorial connection
-#         gender: Gender indicator (0 = female, 1 = male, or as defined)
-#         party_base: Type of party base (1-3, indicating different support structures)
-#         initial_visibility: Starting visibility level before campaign begins
-#     """
-#     candidate_id: int
-#     name: str
-#     party_id: int
-#     ideology: float
-#     incumbency: int
-#     priority: float
-#     quality: float
-#     initial_capital: float
-#     cpf_donations: float
-#     cnpj_donations: float
-#     non_original_donations: float
-#     total_donations: float
-#     base_bairro: int
-#     gender: int
-#     party_base: int
-#     initial_visibility: float
-
+from features.data_loader import DataLoader as DL
+from features.plot_generator import PlotGenerator as PG
 
 # -----------------------------
 # Helpers
@@ -316,10 +251,15 @@ class PelotasElectionABM:
         ensure_dir(self.output_dir)
         ensure_dir(self.output_dir / "plots")
 
-        # Initialize all agents
-        self.parties = self._load_or_generate_parties()
-        self.candidates = self._load_or_generate_candidates(self.parties)
-        self.voters = self._generate_voters(self.parties)
+                # Usa o DataLoader
+        self.data_loader = DL(args, self.rng)
+
+        self.plot_generator = PG(self.output_dir)
+        
+        # Carrega os dados
+        self.parties = self.data_loader.load_parties()
+        self.candidates = self.data_loader.load_candidates(self.parties)
+        self.voters = self.data_loader.load_voters(self.parties)
         
         # Create social influence network
         self.neighbors = make_small_world_neighbors(
@@ -332,206 +272,6 @@ class PelotasElectionABM:
         # Precompute arrays for performance
         self._precompute_candidate_arrays()
         self._precompute_voter_arrays()
-
-    # -----------------------------
-    # Data initialization
-    # -----------------------------
-
-    def _load_or_generate_parties(self) -> pd.DataFrame:
-        """
-        Load parties from CSV or generate synthetic parties.
-        
-        Returns:
-            DataFrame with party information including ideology, organization,
-            budget, and strategic concentration.
-        """
-        if self.args.party_csv and Path(self.args.party_csv).exists():
-            df = pd.read_csv(self.args.party_csv)
-        else:
-            # Generate synthetic parties
-            names = [f"P{idx+1:02d}" for idx in range(self.args.n_parties)]
-            
-            # Ideology spread across spectrum with small random variation
-            ideology = np.linspace(-0.9, 0.9, self.args.n_parties)
-            ideology += self.rng.normal(0, 0.08, self.args.n_parties)
-            
-            # Organizational capacity
-            org = np.clip(self.rng.normal(0.6, 0.15, self.args.n_parties), 0.2, 1.0)
-            
-            # Budget from lognormal distribution
-            budget = self.rng.lognormal(
-                mean=np.log(self.args.party_budget_mean), 
-                sigma=self.args.party_budget_sigma, 
-                size=self.args.n_parties
-            )
-            
-            # How strategically concentrated resources are
-            strategic_concentration = np.clip(
-                self.rng.normal(self.args.party_concentration_mean, 0.25, self.args.n_parties), 
-                0.1, 3.0
-            )
-            
-            df = pd.DataFrame({
-                "party_id": np.arange(self.args.n_parties, dtype=int),
-                "name": names,
-                "ideology": ideology,
-                "organization": org,
-                "central_budget": budget,
-                "strategic_concentration": strategic_concentration,
-            })
-        
-        # Validate required columns
-        required = {"party_id", "name", "ideology", "organization", "central_budget", "strategic_concentration"}
-        missing = required - set(df.columns)
-        if missing:
-            raise ValueError(f"party_csv missing columns: {sorted(missing)}")
-        
-        return df.copy()
-
-    def _load_or_generate_candidates(self, parties: pd.DataFrame) -> pd.DataFrame:
-        """
-        Load candidates from CSV or generate synthetic candidates.
-        
-        Args:
-            parties: DataFrame with party information
-            
-        Returns:
-            DataFrame with candidate information including ideology, donations,
-            resources, and visibility.
-        """
-        if self.args.candidate_csv and Path(self.args.candidate_csv).exists():
-            df = pd.read_csv(self.args.candidate_csv)
-        else:
-            n = self.args.n_candidates
-            
-            # Assign candidates to parties
-            party_ids = self.rng.choice(parties["party_id"].to_numpy(), size=n, replace=True)
-            party_lookup = parties.set_index("party_id")
-            party_ideology = party_lookup.loc[party_ids, "ideology"].to_numpy()
-            
-            # Candidate ideology may differ from party
-            cand_ideology = np.clip(
-                party_ideology + self.rng.normal(0, self.args.candidate_ideology_sigma, n), 
-                -1.0, 1.0
-            )
-            
-            # Generate donations from different sources
-            cpf = self.rng.lognormal(mean=np.log(self.args.cpf_mean), sigma=self.args.cpf_sigma, size=n)
-            cnpj = self.rng.lognormal(mean=np.log(self.args.cnpj_mean), sigma=self.args.cnpj_sigma, size=n)
-            non_original = self.rng.lognormal(mean=np.log(self.args.non_original_mean), sigma=self.args.non_original_sigma, size=n)
-            
-            # Corporate donations were banned in Brazil for 2020 and 2024 cycles
-            if self.args.cycle in {2020, 2024}:
-                cnpj *= 0.0
-            
-            total = cpf + cnpj + non_original
-            
-            df = pd.DataFrame({
-                "candidate_id": np.arange(n, dtype=int),
-                "name": [f"cand_{i:03d}" for i in range(n)],
-                "party_id": party_ids,
-                "ideology": cand_ideology,
-                "incumbency": self.rng.binomial(1, self.args.incumbency_prob, size=n),
-                "priority": np.clip(self.rng.lognormal(mean=0.0, sigma=0.5, size=n), 0.2, 5.0),
-                "quality": np.clip(self.rng.normal(0.6, 0.18, size=n), 0.05, 1.2),
-                "initial_capital": self.rng.lognormal(mean=np.log(self.args.initial_capital_mean), sigma=0.6, size=n),
-                "cpf_donations": cpf,
-                "cnpj_donations": cnpj,
-                "non_original_donations": non_original,
-                "total_donations": total,
-                "base_bairro": self.rng.integers(0, self.args.n_bairros, size=n),
-                "gender": self.rng.binomial(1, 0.4, size=n),
-                "party_base": self.rng.integers(1, 4, size=n),
-                "initial_visibility": np.clip(self.rng.normal(0.15, 0.08, size=n), 0.01, 0.5),
-            })
-        
-        # Validate required columns
-        required = {
-            "candidate_id", "name", "party_id", "ideology", "incumbency", "priority", "quality",
-            "initial_capital", "cpf_donations", "cnpj_donations", "non_original_donations", "total_donations",
-            "base_bairro", "gender", "party_base", "initial_visibility"
-        }
-        missing = required - set(df.columns)
-        if missing:
-            raise ValueError(f"candidate_csv missing columns: {sorted(missing)}")
-
-        # Allocate party central budgets to candidates based on priority and strategic concentration
-        party_info = parties.set_index("party_id")
-        df = df.copy()
-        df["party_transfer"] = 0.0
-        
-        for pid, sub in df.groupby("party_id"):
-            # Strategic concentration: higher phi means more focus on top candidates
-            phi = float(party_info.loc[pid, "strategic_concentration"])
-            budget = float(party_info.loc[pid, "central_budget"])
-            
-            # Weight candidates by priority^phi
-            w = np.power(np.clip(sub["priority"].to_numpy(), 1e-6, None), phi)
-            alloc = budget * w / w.sum() if w.sum() > 0 else 0
-            df.loc[sub.index, "party_transfer"] = alloc
-        
-        # Calculate total effective resources from all sources with weights
-        df["effective_resources"] = (
-            self.args.weight_cpf * df["cpf_donations"]
-            + self.args.weight_cnpj * df["cnpj_donations"]
-            + self.args.weight_non_original * df["non_original_donations"]
-            + self.args.weight_party_transfer * df["party_transfer"]
-            + self.args.weight_initial_capital * df["initial_capital"]
-        )
-        
-        return df
-
-    def _generate_voters(self, parties: pd.DataFrame) -> pd.DataFrame:
-        """
-        Generate synthetic voters with various attributes.
-        
-        Args:
-            parties: DataFrame with party information
-            
-        Returns:
-            DataFrame with voter information including ideology, neighborhood,
-            interest level, and social susceptibility.
-        """
-        n = self.args.n_voters
-        
-        # Voters have preferred parties based on party organization strength
-        party_probs = parties["organization"].to_numpy()
-        party_probs = party_probs / party_probs.sum()
-        preferred_party = self.rng.choice(parties["party_id"].to_numpy(), size=n, p=party_probs)
-        
-        # Ideology influenced by preferred party
-        party_lookup = parties.set_index("party_id")
-        base_ideology = party_lookup.loc[preferred_party, "ideology"].to_numpy()
-        voter_ideology = np.clip(
-            base_ideology + self.rng.normal(0, self.args.voter_ideology_sigma, n), 
-            -1.0, 1.0
-        )
-        
-        # Assign neighborhoods
-        bairros = self.rng.integers(0, self.args.n_bairros, size=n)
-        
-        # Political interest level (beta distribution: bimodal tends to extremes)
-        interest = np.clip(self.rng.beta(2.0, 2.0, size=n), 0.02, 0.98)
-        
-        # Party identification strength
-        party_id_strength = np.clip(self.rng.beta(2.0, 2.5, size=n), 0.0, 1.0)
-        
-        # Susceptibility to campaign effects
-        campaign_susc = np.clip(self.rng.beta(2.5, 2.0, size=n), 0.0, 1.0)
-        
-        # Susceptibility to social influence
-        social_susc = np.clip(self.rng.beta(2.0, 2.0, size=n), 0.0, 1.0)
-        
-        return pd.DataFrame({
-            "voter_id": np.arange(n, dtype=int),
-            "ideology": voter_ideology,
-            "bairro": bairros,
-            "interest": interest,
-            "party_strength": party_id_strength,
-            "campaign_susc": campaign_susc,
-            "social_susc": social_susc,
-            "preferred_party": preferred_party,
-        })
 
     def _precompute_candidate_arrays(self) -> None:
         """
@@ -772,7 +512,9 @@ class PelotasElectionABM:
             )
 
         # Generate plots
-        self._make_plots(candidate_df, party_df, visibility_hist)
+        #self._make_plots(candidate_df, party_df, visibility_hist)
+        # No final, em vez de self._make_plots(...)
+        self.plot_generator.generate_all(candidate_df, party_df, visibility_hist)
 
         # Build and save summary
         summary = self._build_summary(candidate_df, party_df, eq)
@@ -873,61 +615,61 @@ class PelotasElectionABM:
             "n_parties_with_seats": int((party_df["seats"] > 0).sum()),
         }
 
-    def _make_plots(self, candidate_df: pd.DataFrame, party_df: pd.DataFrame, visibility_hist: np.ndarray) -> None:
-        """
-        Generate and save visualization plots.
+    # def _make_plots(self, candidate_df: pd.DataFrame, party_df: pd.DataFrame, visibility_hist: np.ndarray) -> None:
+    #     """
+    #     Generate and save visualization plots.
         
-        Args:
-            candidate_df: DataFrame with candidate results
-            party_df: DataFrame with party results
-            visibility_hist: History of visibility scores over time
-        """
-        plots = self.output_dir / "plots"
+    #     Args:
+    #         candidate_df: DataFrame with candidate results
+    #         party_df: DataFrame with party results
+    #         visibility_hist: History of visibility scores over time
+    #     """
+    #     plots = self.output_dir / "plots"
         
-        # Plot 1: Candidate vote distribution (Pareto-like)
-        fig, ax = plt.subplots(figsize=(7, 4.5))
-        sorted_votes = np.sort(candidate_df["votes"].to_numpy())[::-1]
-        ax.plot(np.arange(1, len(sorted_votes) + 1), sorted_votes, marker="o", linewidth=1.2)
-        ax.set_xlabel("candidate rank")
-        ax.set_ylabel("votes")
-        ax.set_title("Candidate vote distribution")
-        ax.grid(alpha=0.3)
-        fig.tight_layout()
-        fig.savefig(plots / "candidate_vote_distribution.png", dpi=180)
-        plt.close(fig)
+    #     # Plot 1: Candidate vote distribution (Pareto-like)
+    #     fig, ax = plt.subplots(figsize=(7, 4.5))
+    #     sorted_votes = np.sort(candidate_df["votes"].to_numpy())[::-1]
+    #     ax.plot(np.arange(1, len(sorted_votes) + 1), sorted_votes, marker="o", linewidth=1.2)
+    #     ax.set_xlabel("candidate rank")
+    #     ax.set_ylabel("votes")
+    #     ax.set_title("Candidate vote distribution")
+    #     ax.grid(alpha=0.3)
+    #     fig.tight_layout()
+    #     fig.savefig(plots / "candidate_vote_distribution.png", dpi=180)
+    #     plt.close(fig)
 
-        # Plot 2: Seats by party
-        fig, ax = plt.subplots(figsize=(7.5, 4.5))
-        party_sorted = party_df.sort_values("seats", ascending=False)
-        ax.bar(party_sorted["name"], party_sorted["seats"])
-        ax.set_xlabel("party")
-        ax.set_ylabel("seats")
-        ax.set_title("Seats by party")
-        ax.tick_params(axis="x", rotation=45)
-        fig.tight_layout()
-        fig.savefig(plots / "party_seats.png", dpi=180)
-        plt.close(fig)
+    #     # Plot 2: Seats by party
+    #     fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    #     party_sorted = party_df.sort_values("seats", ascending=False)
+    #     ax.bar(party_sorted["name"], party_sorted["seats"])
+    #     ax.set_xlabel("party")
+    #     ax.set_ylabel("seats")
+    #     ax.set_title("Seats by party")
+    #     ax.tick_params(axis="x", rotation=45)
+    #     fig.tight_layout()
+    #     fig.savefig(plots / "party_seats.png", dpi=180)
+    #     plt.close(fig)
 
-        # Plot 3: Resources vs votes correlation
-        fig, ax = plt.subplots(figsize=(6, 4.5))
-        ax.scatter(candidate_df["effective_resources"], candidate_df["votes"], alpha=0.7)
-        ax.set_xlabel("effective resources")
-        ax.set_ylabel("votes")
-        ax.set_title("Resources vs votes")
-        ax.grid(alpha=0.3)
-        fig.tight_layout()
-        fig.savefig(plots / "resources_vs_votes.png", dpi=180)
-        plt.close(fig)
+    #     # Plot 3: Resources vs votes correlation
+    #     fig, ax = plt.subplots(figsize=(6, 4.5))
+    #     ax.scatter(candidate_df["effective_resources"], candidate_df["votes"], alpha=0.7)
+    #     ax.set_xlabel("effective resources")
+    #     ax.set_ylabel("votes")
+    #     ax.set_title("Resources vs votes")
+    #     ax.grid(alpha=0.3)
+    #     fig.tight_layout()
+    #     fig.savefig(plots / "resources_vs_votes.png", dpi=180)
+    #     plt.close(fig)
 
-        # Plot 4: Mean visibility over time
-        save_plot(
-            np.arange(visibility_hist.shape[0]),
-            visibility_hist.mean(axis=1),
-            "step",
-            "mean visibility",
-            "Average candidate visibility over time",
-            plots / "mean_visibility_over_time.png",
-        )
+    #     # Plot 4: Mean visibility over time
+    #     save_plot(
+    #         np.arange(visibility_hist.shape[0]),
+    #         visibility_hist.mean(axis=1),
+    #         "step",
+    #         "mean visibility",
+    #         "Average candidate visibility over time",
+    #         plots / "mean_visibility_over_time.png",
+    #     )
 
 
 # -----------------------------
