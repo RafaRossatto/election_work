@@ -67,6 +67,7 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
 
 def softmax_sample(logits: np.ndarray, rng: np.random.Generator, tau: float) -> int:
     """
+    Não está sendo usado
     Sample from a softmax distribution with temperature.
     
     Args:
