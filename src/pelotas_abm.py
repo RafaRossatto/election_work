@@ -51,20 +51,6 @@ def ensure_dir(path: Path) -> None:
     """
     path.mkdir(parents=True, exist_ok=True)
 
-
-def sigmoid(x: np.ndarray) -> np.ndarray:
-    """
-    Sigmoid activation function for normalization.
-    
-    Args:
-        x: Input array
-        
-    Returns:
-        Sigmoid-transformed values between 0 and 1
-    """
-    return 1.0 / (1.0 + np.exp(-x))
-
-
 def softmax_sample(logits: np.ndarray, rng: np.random.Generator, tau: float) -> int:
     """
     Não está sendo usado
@@ -83,23 +69,6 @@ def softmax_sample(logits: np.ndarray, rng: np.random.Generator, tau: float) -> 
     probs = np.exp(z)
     probs /= probs.sum()
     return int(rng.choice(len(logits), p=probs))
-
-
-def ring_distance(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """
-    Parece que não está usando.
-    Calculate circular distance on a ring (for ideology space).
-    
-    Args:
-        a: First array of positions
-        b: Second array of positions
-        
-    Returns:
-        Normalized distances between 0 and 1
-    """
-    d = np.abs(a - b)
-    return np.minimum(d, 2.0 - d) / 2.0
-
 
 def make_small_world_neighbors(n: int, k: int, p_rewire: float, rng: np.random.Generator) -> List[np.ndarray]:
     """
