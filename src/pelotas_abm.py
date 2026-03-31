@@ -86,6 +86,7 @@ def softmax_sample(logits: np.ndarray, rng: np.random.Generator, tau: float) -> 
 
 def ring_distance(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
+    Parece que não está usando.
     Calculate circular distance on a ring (for ideology space).
     
     Args:
