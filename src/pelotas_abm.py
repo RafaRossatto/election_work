@@ -27,7 +27,8 @@ from typing import Dict, List, Tuple
 
 from features.data_loader import DataLoader as DL
 from features.plot_generator import PlotGenerator as PG
-from features.lattice import SmallWorldLattice: as SWL
+from features.lattice import SmallWorldLattice as SWL
+from features.parametersystem import ParameterSystem
 
 import argparse
 import json
@@ -311,7 +312,7 @@ class PelotasElectionABM:
             
             for i in range(self.n_voters):
                 # Social influence from neighbors
-                neigh = self.neighbors[i]
+                neigh = self.social_network[i]
                 neigh_choices = current_choices[neigh]
                 social_by_candidate = np.bincount(neigh_choices, minlength=self.n_candidates).astype(float)
                 if social_by_candidate.sum() > 0:
@@ -538,152 +539,6 @@ class PelotasElectionABM:
             "largest_party_seats": int(party_df["seats"].max()),
             "n_parties_with_seats": int((party_df["seats"] > 0).sum()),
         }
-# -----------------------------
-# CLI
-# -----------------------------
-
-def build_parser() -> argparse.ArgumentParser:
-    """
-    Build command-line argument parser with all model parameters.
-    
-    Returns:
-        Configured ArgumentParser
-    """
-    p = argparse.ArgumentParser(description="Agent-based model for Pelotas council elections")
-
-    # Basic run control
-    p.add_argument("--output-dir", type=str, required=True, help="directory for outputs")
-    p.add_argument("--seed", type=int, default=12345, help="random seed for reproducibility")
-    p.add_argument("--cycle", type=int, default=2024, choices=[2016, 2020, 2024], 
-                   help="election cycle (affects corporate donation rules)")
-
-    # Sizes and scales
-    p.add_argument("--n-voters", type=int, default=20000, help="number of voters in simulation")
-    p.add_argument("--n-candidates", type=int, default=300, help="number of candidates")
-    p.add_argument("--n-parties", type=int, default=12, help="number of political parties")
-    p.add_argument("--n-bairros", type=int, default=12, help="number of neighborhoods")
-    p.add_argument("--n-seats", type=int, default=21, help="number of council seats")
-    p.add_argument("--n-steps", type=int, default=12, help="number of campaign steps to simulate")
-
-    # Social network parameters
-    p.add_argument("--k-neighbors", type=int, default=10, 
-                   help="number of neighbors per voter in social network (must be even)")
-    p.add_argument("--rewire-prob", type=float, default=0.08, 
-                   help="probability of rewiring in small-world network")
-
-    # Optional empirical inputs
-    p.add_argument("--party-csv", type=str, default="", 
-                   help="path to CSV with party data (generates synthetic if not provided)")
-    p.add_argument("--candidate-csv", type=str, default="", 
-                   help="path to CSV with candidate data (generates synthetic if not provided)")
-
-    # Party generation parameters
-    p.add_argument("--party-budget-mean", type=float, default=200000.0, 
-                   help="mean party budget (lognormal distribution)")
-    p.add_argument("--party-budget-sigma", type=float, default=0.7, 
-                   help="sigma for party budget distribution")
-    p.add_argument("--party-concentration-mean", type=float, default=1.2, 
-                   help="mean strategic concentration (higher = more focus on top candidates)")
-
-    # Candidate generation parameters
-    p.add_argument("--candidate-ideology-sigma", type=float, default=0.18, 
-                   help="standard deviation of candidate ideology around party ideology")
-    p.add_argument("--incumbency-prob", type=float, default=0.08, 
-                   help="probability a candidate is incumbent")
-    p.add_argument("--initial-capital-mean", type=float, default=12000.0, 
-                   help="mean initial capital")
-    p.add_argument("--cpf-mean", type=float, default=4000.0, 
-                   help="mean individual donations")
-    p.add_argument("--cpf-sigma", type=float, default=1.0, 
-                   help="sigma for individual donations")
-    p.add_argument("--cnpj-mean", type=float, default=2500.0, 
-                   help="mean corporate donations")
-    p.add_argument("--cnpj-sigma", type=float, default=1.0, 
-                   help="sigma for corporate donations")
-    p.add_argument("--non-original-mean", type=float, default=18000.0, 
-                   help="mean other donations")
-    p.add_argument("--non-original-sigma", type=float, default=1.0, 
-                   help="sigma for other donations")
-
-    # Voter generation parameters
-    p.add_argument("--voter-ideology-sigma", type=float, default=0.25, 
-                   help="standard deviation of voter ideology around preferred party")
-
-    # Resource weights for effective resources calculation
-    p.add_argument("--weight-cpf", type=float, default=1.0, 
-                   help="weight for individual donations")
-    p.add_argument("--weight-cnpj", type=float, default=1.0, 
-                   help="weight for corporate donations")
-    p.add_argument("--weight-non-original", type=float, default=1.1, 
-                   help="weight for other donations")
-    p.add_argument("--weight-party-transfer", type=float, default=1.2, 
-                   help="weight for party transfers")
-    p.add_argument("--weight-initial-capital", type=float, default=0.5, 
-                   help="weight for initial capital")
-
-    # Visibility dynamics parameters
-    p.add_argument("--visibility-decay", type=float, default=0.25, 
-                   help="decay rate of visibility per step")
-    p.add_argument("--a-resource", type=float, default=0.09, 
-                   help="resource contribution to visibility")
-    p.add_argument("--b-quality", type=float, default=0.20, 
-                   help="quality contribution to visibility")
-    p.add_argument("--c-party-org", type=float, default=0.16, 
-                   help="party organization contribution to visibility")
-    p.add_argument("--d-local", type=float, default=0.12, 
-                   help="local presence contribution to visibility")
-
-    # Territorial field parameters
-    p.add_argument("--territorial-background", type=float, default=0.05, 
-                   help="baseline territorial strength")
-    p.add_argument("--territorial-peak", type=float, default=0.90, 
-                   help="peak territorial strength at home base")
-    p.add_argument("--territorial-decay", type=float, default=1.5, 
-                   help="decay rate of territorial strength with distance")
-
-    # Utility parameters (weights for different voter decision factors)
-    p.add_argument("--alpha-ideology", type=float, default=1.2, 
-                   help="weight for ideological alignment")
-    p.add_argument("--beta-visibility", type=float, default=1.0, 
-                   help="weight for campaign visibility")
-    p.add_argument("--gamma-territorial", type=float, default=1.1, 
-                   help="weight for territorial affinity")
-    p.add_argument("--delta-social", type=float, default=0.85, 
-                   help="weight for social influence")
-    p.add_argument("--eta-party", type=float, default=0.95, 
-                   help="weight for party identification")
-    p.add_argument("--mu-incumbency", type=float, default=0.5, 
-                   help="weight for incumbency advantage")
-    p.add_argument("--kappa-viability", type=float, default=0.7, 
-                   help="weight for strategic voting (viability consideration)")
-
-    # Strategic voting parameters
-    p.add_argument("--f-strategic", type=float, default=0.35, 
-                   help="fraction of voters engaging in strategic voting")
-    p.add_argument("--rho1", type=float, default=0.45, 
-                   help="weight for current vote share in viability calculation")
-    p.add_argument("--rho2", type=float, default=0.35, 
-                   help="weight for social support in viability calculation")
-    p.add_argument("--rho3", type=float, default=0.20, 
-                   help="weight for party strength in viability calculation")
-
-    # Choice noise and attention parameters
-    p.add_argument("--tau", type=float, default=0.7, 
-                   help="temperature for softmax choice (lower = more deterministic)")
-    p.add_argument("--noise-sigma", type=float, default=0.03, 
-                   help="standard deviation of random noise in utility")
-    p.add_argument("--shortlist-size", type=int, default=35, 
-                   help="number of candidates voters consider (0 = all)")
-
-    # Output options
-    p.add_argument("--save-voters", action="store_true", 
-                   help="save full voter results (may be large)")
-    p.add_argument("--voter-sample-size", type=int, default=2000, 
-                   help="sample size for voter results when not saving all")
-
-    return p
-
-
 def main() -> None:
     """
     Main entry point for the simulation.
@@ -691,8 +546,19 @@ def main() -> None:
     Parses command-line arguments, initializes the model, runs the simulation,
     and prints summary statistics.
     """
-    parser = build_parser()
-    args = parser.parse_args()
+    # parser = build_parser()
+    # args = parser.parse_args()
+    # model = PelotasElectionABM(args)
+    # summary = model.run()
+    # print(json.dumps(summary, indent=2))
+
+    param_system = ParameterSystem()
+    args = param_system.parse_args()
+    
+    # Optional: save parameters for reproducibility
+    # output_dir = Path(args.output_dir)
+    # param_system.save_to_file(output_dir / "params.json")
+    
     model = PelotasElectionABM(args)
     summary = model.run()
     print(json.dumps(summary, indent=2))
