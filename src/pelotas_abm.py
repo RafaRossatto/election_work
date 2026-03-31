@@ -22,21 +22,20 @@ The code is self-contained and can run without empirical data. If empirical cand
 or party tables are available, they can be supplied via CSV files.
 """
 from __future__ import annotations
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+from features.data_loader import DataLoader as DL
+from features.plot_generator import PlotGenerator as PG
+from features.lattice import SmallWorldLattice: as SWL
 
 import argparse
 import json
 import math
 import os
-from pathlib import Path
-from typing import Dict, List, Tuple
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-
-from features.data_loader import DataLoader as DL
-from features.plot_generator import PlotGenerator as PG
 
 # -----------------------------
 # Helpers
@@ -68,51 +67,6 @@ def softmax_sample(logits: np.ndarray, rng: np.random.Generator, tau: float) -> 
     probs = np.exp(z)
     probs /= probs.sum()
     return int(rng.choice(len(logits), p=probs))
-
-def make_small_world_neighbors(n: int, k: int, p_rewire: float, rng: np.random.Generator) -> List[np.ndarray]:
-    """
-    Create a Watts-Strogatz small-world network for social influence.
-    Aqui podemos criar a classe que cria o grafo.
-    Args:
-        n: Number of nodes (voters)
-        k: Number of neighbors per node (must be even)
-        p_rewire: Probability of rewiring each edge
-        rng: Random number generator
-        
-    Returns:
-        List of arrays containing neighbor indices for each node
-        
-    Raises:
-        ValueError: If k is not even
-    """
-    if k % 2 != 0:
-        raise ValueError("k_neighbors must be even for the small-world construction.")
-    
-    neighbors = [set() for _ in range(n)]
-    half = k // 2
-    
-    # Create regular ring lattice
-    for i in range(n):
-        for d in range(1, half + 1):
-            j = (i + d) % n
-            neighbors[i].add(j)
-            neighbors[j].add(i)
-    
-    # Rewire edges with probability p_rewire
-    for i in range(n):
-        for d in range(1, half + 1):
-            j = (i + d) % n
-            if rng.random() < p_rewire:
-                possible = list(set(range(n)) - {i} - neighbors[i])
-                if possible:
-                    new_j = int(rng.choice(possible))
-                    neighbors[i].discard(j)
-                    neighbors[j].discard(i)
-                    neighbors[i].add(new_j)
-                    neighbors[new_j].add(i)
-    
-    return [np.array(sorted(list(s)), dtype=np.int32) for s in neighbors]
-
 
 def allocate_seats_largest_remainder(
     party_votes: pd.Series,
@@ -232,7 +186,7 @@ class PelotasElectionABM:
         self.voters = self.data_loader.load_voters(self.parties)
         
         # Create social influence network
-        self.neighbors = make_small_world_neighbors(
+        self.social_network = SWL(
             args.n_voters,
             args.k_neighbors,
             args.rewire_prob,
@@ -584,64 +538,6 @@ class PelotasElectionABM:
             "largest_party_seats": int(party_df["seats"].max()),
             "n_parties_with_seats": int((party_df["seats"] > 0).sum()),
         }
-
-    # def _make_plots(self, candidate_df: pd.DataFrame, party_df: pd.DataFrame, visibility_hist: np.ndarray) -> None:
-    #     """
-    #     Generate and save visualization plots.
-        
-    #     Args:
-    #         candidate_df: DataFrame with candidate results
-    #         party_df: DataFrame with party results
-    #         visibility_hist: History of visibility scores over time
-    #     """
-    #     plots = self.output_dir / "plots"
-        
-    #     # Plot 1: Candidate vote distribution (Pareto-like)
-    #     fig, ax = plt.subplots(figsize=(7, 4.5))
-    #     sorted_votes = np.sort(candidate_df["votes"].to_numpy())[::-1]
-    #     ax.plot(np.arange(1, len(sorted_votes) + 1), sorted_votes, marker="o", linewidth=1.2)
-    #     ax.set_xlabel("candidate rank")
-    #     ax.set_ylabel("votes")
-    #     ax.set_title("Candidate vote distribution")
-    #     ax.grid(alpha=0.3)
-    #     fig.tight_layout()
-    #     fig.savefig(plots / "candidate_vote_distribution.png", dpi=180)
-    #     plt.close(fig)
-
-    #     # Plot 2: Seats by party
-    #     fig, ax = plt.subplots(figsize=(7.5, 4.5))
-    #     party_sorted = party_df.sort_values("seats", ascending=False)
-    #     ax.bar(party_sorted["name"], party_sorted["seats"])
-    #     ax.set_xlabel("party")
-    #     ax.set_ylabel("seats")
-    #     ax.set_title("Seats by party")
-    #     ax.tick_params(axis="x", rotation=45)
-    #     fig.tight_layout()
-    #     fig.savefig(plots / "party_seats.png", dpi=180)
-    #     plt.close(fig)
-
-    #     # Plot 3: Resources vs votes correlation
-    #     fig, ax = plt.subplots(figsize=(6, 4.5))
-    #     ax.scatter(candidate_df["effective_resources"], candidate_df["votes"], alpha=0.7)
-    #     ax.set_xlabel("effective resources")
-    #     ax.set_ylabel("votes")
-    #     ax.set_title("Resources vs votes")
-    #     ax.grid(alpha=0.3)
-    #     fig.tight_layout()
-    #     fig.savefig(plots / "resources_vs_votes.png", dpi=180)
-    #     plt.close(fig)
-
-    #     # Plot 4: Mean visibility over time
-    #     save_plot(
-    #         np.arange(visibility_hist.shape[0]),
-    #         visibility_hist.mean(axis=1),
-    #         "step",
-    #         "mean visibility",
-    #         "Average candidate visibility over time",
-    #         plots / "mean_visibility_over_time.png",
-    #     )
-
-
 # -----------------------------
 # CLI
 # -----------------------------
