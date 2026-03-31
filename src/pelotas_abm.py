@@ -102,7 +102,7 @@ def ring_distance(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def make_small_world_neighbors(n: int, k: int, p_rewire: float, rng: np.random.Generator) -> List[np.ndarray]:
     """
     Create a Watts-Strogatz small-world network for social influence.
-    
+    Aqui podemos criar a classe que cria o grafo.
     Args:
         n: Number of nodes (voters)
         k: Number of neighbors per node (must be even)
