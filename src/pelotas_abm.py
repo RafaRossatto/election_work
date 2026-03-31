@@ -53,7 +53,6 @@ def ensure_dir(path: Path) -> None:
 
 def softmax_sample(logits: np.ndarray, rng: np.random.Generator, tau: float) -> int:
     """
-    Não está sendo usado
     Sample from a softmax distribution with temperature.
     
     Args:
