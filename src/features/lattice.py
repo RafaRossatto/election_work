@@ -1,3 +1,5 @@
+from typing import List
+import numpy as np
 class SmallWorldLattice:
     """
     Watts-Strogatz small-world network for social influence.

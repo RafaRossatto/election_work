@@ -52,3 +52,7 @@ venv/
 # Arquivos de sistema
 .DS_Store
 Thumbs.db
+
+# Arquivos de saida
+
+abm_runs/
