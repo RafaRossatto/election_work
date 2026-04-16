@@ -11,7 +11,7 @@ set -euo pipefail
 
 PYTHON_BIN=${PYTHON_BIN:-python3}
 SCRIPT=${SCRIPT:-./pelotas_abm.py}
-BASE_OUT=${BASE_OUT:-./abm_runs}
+BASE_OUT=${BASE_OUT:-/media/camafeu/data/rossatto/election_work/abm_runs}
 
 mkdir -p "$BASE_OUT"
 
